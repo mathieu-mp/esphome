@@ -270,14 +270,14 @@ class Display : public PollingComponent {
    * are capsules composed of two smaller circles, which provide a smooth finish
    * while maintaining the precise line thickness.
    *
-   * @param x1 The x-coordinate of the starting point.
-   * @param y1 The y-coordinate of the starting point.
-   * @param x2 The x-coordinate of the ending point.
-   * @param y2 The y-coordinate of the ending point.
+   * @param x_start The x-coordinate of the starting point.
+   * @param y_start The y-coordinate of the starting point.
+   * @param x_end The x-coordinate of the ending point.
+   * @param y_end The y-coordinate of the ending point.
    * @param thickness The thickness of the line in pixels. Must be >= 1.
    * @param color The color of the line.
    */
-  void thick_line(int x1, int y1, int x2, int y2, int thickness, Color color = COLOR_ON);
+  void thick_line(int x_start, int y_start, int x_end, int y_end, int thickness, Color color = COLOR_ON);
 
   /// Draw a straight line at the given angle based on the origin [x, y] for a specified length with the given color.
   void line_at_angle(int x, int y, int angle, int length, Color color = COLOR_ON);

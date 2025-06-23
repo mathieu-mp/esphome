@@ -36,67 +36,104 @@ void HOT Display::line(int x1, int y1, int x2, int y2, Color color) {
   }
 }
 
-void Display::thick_line(int x1, int y1, int x2, int y2, int thickness, Color color) {
+void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thickness, Color color) {
   // A thickness of 0 or less is not displayable, so we do nothing.
   if (thickness <= 0) {
     return;
   }
   // For a thickness of 1, the standard line function is much faster and visually identical.
   if (thickness == 1) {
-    this->line(x1, y1, x2, y2, color);
+    this->line(x_start, y_start, x_end, y_end, color);
     return;
   }
 
-  // Calculate the line angle once.
-  const float angle = atan2f(y2 - y1, x2 - x1);
+  // We will make use of the Bresenham's thick line algorithm with perpendicular brushes.
+  // This consists in applying a perpendicular brush for each point of the calculated main line, 
+  // and this draws the thick line centered on the main line.
+  // So there will be two Bresenham's algorithm running one inside the other.
 
-  // Calculate the perpendicular vector components.
-  // This vector, of length 1, points perpendicular to the line's direction.
-  const float dx_perpendicular = sinf(angle);
-  const float dy_perpendicular = -cosf(angle);
+  // Main Bresenham's Algorithm Setup:
+  // Use temporary variables for the main line to keep original coordinates intact for the caps.
+  int x_current = x_start;
+  int y_current = y_start;
 
-  // To give the line its thickness, we expand it into a rectangle.
-  // The following calculations will help to define the vertices of this rectangle.
-  const float offset = (float) thickness / 2.0f;
-  const float dx_body = dx_perpendicular * offset;
-  const float dy_body = dy_perpendicular * offset;
-  // Define the four vertices (A, B, C, D) of the rectangle that forms the line's body.
-  // A and B are the vertices at the start of the line, C and D are at the end.
-  const int a_x = roundf(x1 + dx_body);
-  const int a_y = roundf(y1 + dy_body);
-  const int b_x = roundf(x1 - dx_body);
-  const int b_y = roundf(y1 - dy_body);
-  const int c_x = roundf(x2 + dx_body);
-  const int c_y = roundf(y2 + dy_body);
-  const int d_x = roundf(x2 - dx_body);
-  const int d_y = roundf(y2 - dy_body);
+  // These variables prepare the Bresenham's algorithm for the main line path.
+  int x_dist_main = abs(x_end - x_current);     // Total horizontal distance of the main line
+  int x_step_main = x_current < x_end ? 1 : -1;   // Direction of the step on the x-axis (+1 or -1)
+  int y_dist_main = -abs(y_end - y_current);    // Total vertical distance (negative for Bresenham)
+  int y_step_main = y_current < y_end ? 1 : -1;   // Direction of the step on the y-axis (+1 or -1)
+  int error_main = x_dist_main + y_dist_main;   // Initial error term for the main line
 
-  // Draw the rectangular body of the line by splitting it into two triangles (ABC and DCB).
-  this->filled_triangle(a_x, a_y, b_x, b_y, c_x, c_y, color);
-  this->filled_triangle(d_x, d_y, c_x, c_y, b_x, b_y, color);
+  while (true) {
+    // Perpendicular Bresenham's Algorithm:
+    // For each point on the main line, draw a perpendicular line segment.
+    // The direction vector of the perpendicular line is derived from the main line's vector.
+    int x_dist_perp = abs(y_dist_main);
+    int x_step_perp = y_step_main;
+    int y_dist_perp = -abs(x_dist_main);
+    int y_step_perp = -x_step_main;
+    int error_perp = x_dist_perp + y_dist_perp;
 
-  // Now, draw the end caps, respecting the exact thickness.
+    // Start drawing the perpendicular line from its center.
+    int x_perp = x_current - ((thickness - 1) / 2) * x_step_perp;
+    int y_perp = y_current - ((thickness - 1) / 2) * y_step_perp;
+
+    for (int i = 0; i < thickness; ++i) {
+      this->draw_pixel_at(x_perp, y_perp, color);
+      int error2_perp = 2 * error_perp;
+      if (error2_perp >= y_dist_perp) {
+        error_perp += y_dist_perp;
+        x_perp += x_step_perp;
+      }
+      if (error2_perp <= x_dist_perp) {
+        error_perp += x_dist_perp;
+        y_perp += y_step_perp;
+      }
+    }
+
+    if (x_current == x_end && y_current == y_end)
+      break;
+
+    // Advance main Bresenham's algorithm to the next point
+    int error2_main = 2 * error_main;
+    if (error2_main >= y_dist_main) {
+      error_main += y_dist_main;
+      x_current += x_step_main;
+    }
+    if (error2_main <= x_dist_main) {
+      error_main += x_dist_main;
+      y_current += y_step_main;
+    }
+  }
+
+  // End Caps Drawing:
+  // Now, draw the end caps using the original, unmodified coordinates.
   if (thickness % 2 != 0) {
     // For odd thicknesses, we can draw a single perfect circle.
     const int radius = (thickness - 1) / 2;
-    this->filled_circle(x1, y1, radius, color);
-    this->filled_circle(x2, y2, radius, color);
+    this->filled_circle(x_start, y_start, radius, color);
+    this->filled_circle(x_end, y_end, radius, color);
   } else {
     // For even thicknesses, we draw a capsule made of two smaller circles
     // with their centers shifted by 0.5px along the perpendicular vector.
     // This creates a smooth cap with the exact requested thickness.
     const int radius = (thickness / 2) - 1;
 
+    // We need the angle for the perpendicular shift of the cap centers
+    const float angle = atan2f(y_end - y_start, x_end - x_start);
+    const float dx_perp_cap = sinf(angle);
+    const float dy_perp_cap = -cosf(angle);
+
     // Define the centers (M, N, O, P) of the four circles forming the caps.
     // M and N form the start cap, O and P form the end cap.
-    const int m_x = roundf(x1 - dx_perpendicular * 0.5f);
-    const int m_y = roundf(y1 - dy_perpendicular * 0.5f);
-    const int n_x = roundf(x1 + dx_perpendicular * 0.5f);
-    const int n_y = roundf(y1 + dy_perpendicular * 0.5f);
-    const int o_x = roundf(x2 - dx_perpendicular * 0.5f);
-    const int o_y = roundf(y2 - dy_perpendicular * 0.5f);
-    const int p_x = roundf(x2 + dx_perpendicular * 0.5f);
-    const int p_y = roundf(y2 + dy_perpendicular * 0.5f);
+    const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
+    const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
+    const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
+    const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
+    const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
+    const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
+    const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
+    const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
 
     // Draw the two circles for each cap
     this->filled_circle(m_x, m_y, radius, color);
