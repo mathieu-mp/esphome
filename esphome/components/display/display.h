@@ -261,6 +261,24 @@ class Display : public PollingComponent {
   /// Draw a straight line from the point [x1,y1] to [x2,y2] with the given color.
   void line(int x1, int y1, int x2, int y2, Color color = COLOR_ON);
 
+  /**
+   * @brief Draw a straight line with a given thickness and visually rounded end caps.
+   *
+   * This function draws a line of a specified thickness, respecting the exact
+   * thickness value provided. The line ends are visually rounded. For odd
+   * thicknesses, the caps are perfect circles. For even thicknesses, the caps
+   * are capsules composed of two smaller circles, which provide a smooth finish
+   * while maintaining the precise line thickness.
+   *
+   * @param x1 The x-coordinate of the starting point.
+   * @param y1 The y-coordinate of the starting point.
+   * @param x2 The x-coordinate of the ending point.
+   * @param y2 The y-coordinate of the ending point.
+   * @param thickness The thickness of the line in pixels. Must be >= 1.
+   * @param color The color of the line.
+   */
+  void thick_line(int x1, int y1, int x2, int y2, int thickness, Color color = COLOR_ON);
+
   /// Draw a straight line at the given angle based on the origin [x, y] for a specified length with the given color.
   void line_at_angle(int x, int y, int angle, int length, Color color = COLOR_ON);
 
