@@ -2,8 +2,8 @@
 #include <utility>
 #include "display_color_utils.h"
 #include "esphome/core/hal.h"
-#include "esphome/core/log.h"
-#include <cmath> // For sqrtf, roundf, fabsf
+#include "esphome/core/log.hh"
+#include <cmath> // For sqrtf, roundf
 
 namespace esphome {
 namespace display {
@@ -142,32 +142,20 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish. The diameter of the cap is dynamically calculated
-  // to perfectly cover the "cut" of the line, based on its dominant axis.
+  // perfect rounded finish.
+  int cap_diameter;
+
+  // If the line is diagonal, the seam-filling makes the cut wider.
+  // We pragmatically increase the cap diameter by 1 to cover this for a better
+  // visual result, as suggested.
+  if (dx != 0 && dy != 0) {
+    cap_diameter = thickness + 1;
+  } else {
+    cap_diameter = thickness;
+  }
 
   // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
   color = Color(255, 0, 0);
-  
-  int cap_diameter;
-  if (line_length > 0) {
-    // Project the thickness onto the X and Y axes to find the cut's bounding box.
-    const float cut_width = thickness * fabsf(dy) / line_length;
-    const float cut_height = thickness * fabsf(dx) / line_length;
-
-    // The cap diameter depends on the main line's dominant axis.
-    if (abs(dx) > abs(dy)) {
-        // Line is mostly horizontal, so the perpendicular cut is mostly vertical.
-        // The cap must cover the cut's height.
-        cap_diameter = roundf(cut_height);
-    } else {
-        // Line is mostly vertical, so the perpendicular cut is mostly horizontal.
-        // The cap must cover the cut's width.
-        cap_diameter = roundf(cut_width);
-    }
-  } else {
-    // For a zero-length line, the cap diameter is simply the thickness.
-    cap_diameter = thickness;
-  }
   
   this->filled_circle_by_diameter(x_start, y_start, cap_diameter, color);
   this->filled_circle_by_diameter(x_end, y_end, cap_diameter, color);
@@ -308,6 +296,7 @@ void Display::filled_circle_by_diameter(int center_x, int center_y, int diameter
     // centered between four pixels. This is the standard, performant way
     // to draw a visually correct circle with an even diameter.
     const int radius = (diameter / 2) - 1;
+    if (radius < 0) return; // For diameter 2, radius is 0. Avoid negative radius.
     // The four centers are the pixels surrounding the theoretical floating-point center.
     this->filled_circle(center_x, center_y, radius, color);
     this->filled_circle(center_x + 1, center_y, radius, color);
