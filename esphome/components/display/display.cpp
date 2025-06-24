@@ -140,33 +140,38 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   }
 
   // --- END CAPS DRAWING ---
-  if (thickness % 2 != 0) {
-    const int radius = (thickness - 1) / 2;
-    this->filled_circle(x_start, y_start, radius, color);
-    this->filled_circle(x_end, y_end, radius, color);
-  } else {
-    const int radius = (thickness / 2) - 1;
-    if (line_length > 0) {
-      const float dx_perp_cap = -dy / line_length;
-      const float dy_perp_cap = dx / line_length;
-      const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
-      const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
-      const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
-      const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
-      const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
-      const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
-      const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
-      const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
+  // A unified "capsule" approach is used for all thicknesses to ensure a full,
+  // rounded end that correctly covers the line body, even on diagonals.
+  // The capsule is formed by two overlapping circles, offset by 0.5px from the endpoint.
+  const int radius = (thickness % 2 != 0) ? (thickness - 1) / 2 : (thickness / 2) - 1;
 
-      this->filled_circle(m_x, m_y, radius, color);
-      this->filled_circle(n_x, n_y, radius, color);
-      this->filled_circle(o_x, o_y, radius, color);
-      this->filled_circle(p_x, p_y, radius, color);
-    } else { // Zero-length line: just draw the cap at the start point
-      this->filled_circle(x_start, y_start, radius, color);
-    }
+  if (line_length > 0) {
+    // Calculate the perpendicular vector for offsetting the cap centers.
+    const float dx_perp_cap = -dy / line_length;
+    const float dy_perp_cap = dx / line_length;
+
+    // Define the centers for the two circles forming the start cap.
+    const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
+    const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
+    const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
+    const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
+
+    // Define the centers for the two circles forming the end cap.
+    const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
+    const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
+    const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
+    const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
+
+    this->filled_circle(m_x, m_y, radius, color);
+    this->filled_circle(n_x, n_y, radius, color);
+    this->filled_circle(o_x, o_y, radius, color);
+    this->filled_circle(p_x, p_y, radius, color);
+  } else {
+    // For a zero-length line, a single circle is a reasonable representation of the capsule.
+    this->filled_circle(x_start, y_start, radius, color);
   }
 }
+
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
   this->line_at_angle(x, y, angle, 0, length, color);
