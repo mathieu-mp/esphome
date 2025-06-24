@@ -61,6 +61,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
       min_y = std::min(min_y, y);
       max_y = std::max(max_y, y);
     }
+    bool is_valid() const { return min_x <= max_x; }
   };
 
   // --- UNIVERSAL PERPENDICULAR BRUSH PROCESSOR ---
@@ -105,16 +106,15 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   };
 
   // --- MAIN LINE BODY DRAWING LOOP ---
-  int x_prev = x_start, y_prev = y_start; // Used to detect the last move's type.
+  int x_prev = x_start, y_prev = y_start;
+  const int x_dist_main = abs(dx);
+  const int x_step_main = (dx > 0) - (dx < 0);
+  const int y_dist_main = -abs(dy);
+  const int y_step_main = (dy > 0) - (dy < 0);
+
   if (line_length > 0) {
     int x_current = x_start;
     int y_current = y_start;
-
-    // Setup for the main Bresenham algorithm.
-    const int x_dist_main = abs(dx);
-    const int x_step_main = (dx > 0) - (dx < 0);
-    const int y_dist_main = -abs(dy);
-    const int y_step_main = (dy > 0) - (dy < 0);
     int error_main = x_dist_main + y_dist_main;
 
     while (true) {
@@ -141,30 +141,47 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   }
 
   // --- END CAPS DRAWING ---
-  // We now measure the actual shape of the final line cut to determine the cap size.
-  BoundingBox final_cut_box;
-  process_perp_brush(x_end, y_end, &final_cut_box); // Measure the final brush stroke
+  Color cap_color = Color(255, 0, 0); // Keep caps red for debugging.
+  
+  // Lambda to measure and draw a cap for a given endpoint.
+  auto draw_measured_cap = [&](int cap_x, int cap_y, int other_x, int other_y) {
+    BoundingBox cut_box;
+    process_perp_brush(cap_x, cap_y, &cut_box);
 
-  // If the last move was diagonal, the cut includes the correction brush. Measure it too.
-  if (x_prev != x_end && y_prev != y_end) {
-    // Determine the position of the correction brush relative to the previous point.
-    // The main loop would have been at x_prev, y_prev and stepped in y to create the smear.
-    int smear_y = y_prev + ((dy > 0) - (dy < 0));
-    process_perp_brush(x_prev, smear_y, &final_cut_box);
+    // If the move to/from the other point is diagonal, measure the smear brush too.
+    if (cap_x != other_x && cap_y != other_y) {
+       // For the end cap, the smear was at (other_x, cap_y).
+       // For the start cap, the smear would be at (cap_x, other_y).
+       int smear_x = (cap_x == x_start) ? cap_x : other_x;
+       int smear_y = (cap_y == y_start) ? other_y : cap_y;
+       process_perp_brush(smear_x, smear_y, &cut_box);
+    }
+    
+    if (cut_box.is_valid()) {
+      const int cut_width = cut_box.max_x - cut_box.min_x + 1;
+      const int cut_height = cut_box.max_y - cut_box.min_y + 1;
+      const int cap_diameter = std::max(cut_width, cut_height);
+      const int radius = (cap_diameter > 0) ? (cap_diameter - 1) / 2 : 0;
+      
+      const int center_x = roundf((cut_box.min_x + cut_box.max_x) / 2.0f);
+      const int center_y = roundf((cut_box.min_y + cut_box.max_y) / 2.0f);
+
+      this->filled_circle(center_x, center_y, radius, cap_color);
+    }
+  };
+  
+  // Determine the point after the start to check for the first diagonal move.
+  int x_next = x_start, y_next = y_start;
+  if (line_length > 0) {
+      int error2_main = 2 * (x_dist_main + y_dist_main);
+      if (error2_main >= y_dist_main) x_next += x_step_main;
+      if (error2_main <= x_dist_main) y_next += y_step_main;
   }
 
-  const int cut_width = final_cut_box.max_x - final_cut_box.min_x + 1;
-  const int cut_height = final_cut_box.max_y - final_cut_box.min_y + 1;
-  const int cap_diameter = std::max(cut_width, cut_height);
-  const int radius = (cap_diameter > 0) ? (cap_diameter - 1) / 2 : 0;
-  
-  // For debugging, we can use a different color for the caps.
-  Color cap_color = Color(255, 0, 0); 
-
-  this->filled_circle(x_start, y_start, radius, cap_color);
-  this->filled_circle(x_end, y_end, radius, cap_color);
+  // Draw both caps using the measurement logic.
+  draw_measured_cap(x_start, y_start, x_next, y_next);
+  draw_measured_cap(x_end, y_end, x_prev, y_prev);
 }
-
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
   this->line_at_angle(x, y, angle, 0, length, color);
 }
