@@ -136,6 +136,10 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // To ensure the end cap correctly covers the line's "cut", we calculate the
   // bounding box of the perpendicular brush stroke and use its largest dimension
   // as the diameter for our circular cap.
+  
+  // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
+  Color cap_color = Color(255, 0, 0);
+
   if (line_length > 0) {
     // Project the thickness onto the X and Y axes to find the cut's bounding box.
     const float cut_width = thickness * fabsf(dy) / line_length;
@@ -148,13 +152,13 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     const int radius = roundf((cap_diameter - 1) / 2.0f);
 
     if (radius >= 0) {
-      this->filled_circle(x_start, y_start, radius, color);
-      this->filled_circle(x_end, y_end, radius, color);
+      this->filled_circle(x_start, y_start, radius, cap_color);
+      this->filled_circle(x_end, y_end, radius, cap_color);
     }
   } else {
     // For a zero-length line, the cap is simply a circle with the given thickness.
     const int radius = (thickness - 1) / 2;
-    this->filled_circle(x_start, y_start, radius, color);
+    this->filled_circle(x_start, y_start, radius, cap_color);
   }
 }
 
