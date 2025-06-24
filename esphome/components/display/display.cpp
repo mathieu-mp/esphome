@@ -159,8 +159,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   const int radius = (cap_diameter > 0) ? (cap_diameter - 1) / 2 : 0;
   
   // For debugging, we can use a different color for the caps.
-  // Color cap_color = Color(255, 0, 0); 
-  Color cap_color = color;
+  Color cap_color = Color(255, 0, 0); 
 
   this->filled_circle(x_start, y_start, radius, cap_color);
   this->filled_circle(x_end, y_end, radius, cap_color);
