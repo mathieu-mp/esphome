@@ -48,37 +48,21 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     return;
   }
 
-  // This function uses a "double Bresenham" algorithm. A "main" algorithm plots the
-  // central path of the line. For each point on this path, a second, "perpendicular"
-  // Bresenham algorithm is called to draw a brush stroke, creating the thickness.
-
   // --- GLOBAL SETUP ---
   const int dx = x_end - x_start;
   const int dy = y_end - y_start;
-
-  // Pre-calculate the line length. This is used to normalize the perpendicular
-  // vector for correct offsetting, avoiding a costly sqrt() in the main loop.
   const float line_length = sqrtf(dx * dx + dy * dy);
 
-  // If the line has zero length, just draw the end caps (which will overlap) and exit.
-  if (line_length == 0) {
-    // The end cap drawing logic at the end of the function will handle this case.
-    // We just need to skip the body drawing part.
-  }
-
   // --- MAIN BRESENHAM'S ALGORITHM SETUP ---
-  int x_current = x_start;
-  int y_current = y_start;
-
   const int x_dist_main = abs(dx);
   const int x_step_main = (dx > 0) - (dx < 0);
   const int y_dist_main = -abs(dy);
   const int y_step_main = (dy > 0) - (dy < 0);
   int error_main = x_dist_main + y_dist_main;
+  int final_error = error_main; // Will be updated by the loop
 
   // --- PERPENDICULAR BRUSH LAMBDA ---
   auto draw_perp_brush = [&](int cx, int cy) {
-    // --- Perpendicular Bresenham's Algorithm Setup ---
     const int perp_dx = -dy;
     const int perp_dy = dx;
 
@@ -88,19 +72,13 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     int y_step_perp = (perp_dy > 0) - (perp_dy < 0);
     int error_perp = x_dist_perp + y_dist_perp;
 
-    // --- Brush Stroke Drawing ---
-    // Calculate the offset distance for centering the brush.
     const float offset = (thickness - 1) / 2.0f;
     int x_perp, y_perp;
 
     if (line_length > 0) {
-      // For lines with length, calculate the start point by offsetting along the
-      // normalized perpendicular vector. This is the only geometrically correct way.
       x_perp = roundf(cx - offset * (-dy / line_length));
       y_perp = roundf(cy - offset * (dx / line_length));
     } else {
-      // For a zero-length line (a single point), the perpendicular is undefined.
-      // We just center the brush on the point itself.
       x_perp = roundf(cx - offset * x_step_perp);
       y_perp = roundf(cy - offset * y_step_perp);
     }
@@ -121,9 +99,15 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- MAIN LINE BODY DRAWING LOOP ---
   if (line_length > 0) {
+    int x_current = x_start;
+    int y_current = y_start;
+
     while (true) {
       draw_perp_brush(x_current, y_current);
-      if (x_current == x_end && y_current == y_end) break;
+      if (x_current == x_end && y_current == y_end) {
+        final_error = error_main; // Capture the final error
+        break;
+      }
       int error2_main = 2 * error_main;
       const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
       if (is_diagonal_move) {
@@ -142,20 +126,40 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish.
-  int cap_diameter;
-
-  // If the line is diagonal, the seam-filling makes the cut wider.
-  // We pragmatically increase the cap diameter by 1 to cover this for a better
-  // visual result, as suggested.
-  if (dx != 0 && dy != 0) {
-    cap_diameter = thickness + 1;
-  } else {
-    cap_diameter = thickness;
-  }
+  // perfect rounded finish, with centers corrected based on the Bresenham error.
   
-  this->filled_circle_by_diameter(x_start, y_start, cap_diameter, color);
-  this->filled_circle_by_diameter(x_end, y_end, cap_diameter, color);
+  // Pragmatic diameter adjustment for better visual on diagonals.
+  int cap_diameter = (dx != 0 && dy != 0) ? thickness + 1 : thickness;
+
+  // Helper lambda to calculate the center offset from a given error.
+  auto get_offset_from_error = [&](int error, int d_x, int d_y) -> std::pair<int, int> {
+      int offset_x = 0;
+      int offset_y = 0;
+      int x_dist = abs(d_x);
+      int y_dist = -abs(d_y);
+
+      // The offset is applied on the minor axis, based on the error's final bias.
+      if (x_dist > abs(y_dist)) { // X-dominant line
+          if (2 * error > x_dist) {
+              offset_y = -((d_y > 0) - (d_y < 0));
+          }
+      } else { // Y-dominant line
+          if (2 * error < y_dist) {
+              offset_x = -((d_x > 0) - (d_x < 0));
+          }
+      }
+      return {offset_x, offset_y};
+  };
+
+  // Calculate correction for the end cap from the final error of the main loop.
+  std::pair<int, int> end_offset = get_offset_from_error(final_error, dx, dy);
+  
+  // Calculate correction for the start cap by using the initial error of a reversed line.
+  int start_error_rev = abs(-dx) - abs(-dy);
+  std::pair<int, int> start_offset = get_offset_from_error(start_error_rev, -dx, -dy);
+
+  this->filled_circle_by_diameter(x_start + start_offset.first, y_start + start_offset.second, cap_diameter, color);
+  this->filled_circle_by_diameter(x_end + end_offset.first, y_end + end_offset.second, cap_diameter, color);
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
