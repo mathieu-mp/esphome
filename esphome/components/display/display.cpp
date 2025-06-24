@@ -3,6 +3,7 @@
 #include "display_color_utils.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
+#include <cmath> // For sqrtf, roundf
 
 namespace esphome {
 namespace display {
@@ -141,46 +142,10 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish. The caps are always centered on the original start/end points.
-  
-  // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
-  Color cap_color = Color(255, 0, 0);
-
-  if (thickness % 2 != 0) {
-    // For odd thicknesses, the cap is a single perfect circle.
-    const int radius = (thickness - 1) / 2;
-    this->filled_circle(x_start, y_start, radius, cap_color);
-    this->filled_circle(x_end, y_end, radius, cap_color);
-  } else {
-    // For even thicknesses, we create a "capsule" shape from two smaller offset circles.
-    const int radius = (thickness / 2) - 1;
-    if (line_length > 0) {
-      // Original atan2f method is restored here for stability.
-      const float angle = atan2f(dy, dx);
-      const float dx_perp_cap = sinf(angle);
-      const float dy_perp_cap = -cosf(angle);
-
-      // Define the centers for the two circles forming the start cap.
-      const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
-      const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
-      const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
-      const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
-      
-      // Define the centers for the two circles forming the end cap.
-      const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
-      const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
-      const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
-      const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
-
-      this->filled_circle(m_x, m_y, radius, cap_color);
-      this->filled_circle(n_x, n_y, radius, cap_color);
-      this->filled_circle(o_x, o_y, radius, cap_color);
-      this->filled_circle(p_x, p_y, radius, cap_color);
-    } else { 
-      // For a zero-length line, a single circle is a reasonable representation.
-      this->filled_circle(x_start, y_start, radius, cap_color);
-    }
-  }
+  // perfect rounded finish. A dedicated function is used to draw a circle from its
+  // diameter, which handles all complexities for a visually pleasing result.
+  this->filled_circle_by_diameter(x_start, y_start, thickness, color);
+  this->filled_circle_by_diameter(x_end, y_end, thickness, color);
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
@@ -303,6 +268,29 @@ void Display::filled_circle(int center_x, int center_y, int radius, Color color)
     }
   } while (dx <= 0);
 }
+
+void Display::filled_circle_by_diameter(int center_x, int center_y, int diameter, Color color) {
+  if (diameter <= 0) {
+    return;
+  }
+
+  if (diameter % 2 != 0) {
+    // For odd diameters, a single centered circle is perfect.
+    const int radius = (diameter - 1) / 2;
+    this->filled_circle(center_x, center_y, radius, color);
+  } else {
+    // For even diameters, we create a "quad-capsule" to simulate a circle
+    // centered between four pixels. This is the standard, performant way
+    // to draw a visually correct circle with an even diameter.
+    const int radius = (diameter / 2) - 1;
+    // The four centers are the pixels surrounding the theoretical floating-point center.
+    this->filled_circle(center_x, center_y, radius, color);
+    this->filled_circle(center_x + 1, center_y, radius, color);
+    this->filled_circle(center_x, center_y + 1, radius, color);
+    this->filled_circle(center_x + 1, center_y + 1, radius, color);
+  }
+}
+
 void Display::filled_ring(int center_x, int center_y, int radius1, int radius2, Color color) {
   int rmax = radius1 > radius2 ? radius1 : radius2;
   int rmin = radius1 < radius2 ? radius1 : radius2;

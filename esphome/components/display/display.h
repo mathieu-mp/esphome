@@ -305,6 +305,27 @@ class Display : public PollingComponent {
   /// Fill a circle centered around [center_x,center_y] with the radius radius with the given color.
   void filled_circle(int center_x, int center_y, int radius, Color color = COLOR_ON);
 
+  /**
+   * @brief Draws a filled circle from a given diameter.
+   *
+   * This function is optimized to produce a visually pleasing circle for any
+   * integer diameter. It addresses the fundamental problem of drawing circles
+   * with an even diameter on a pixel grid.
+   *
+   * For odd diameters, it draws a single, perfectly centered circle using a
+   * standard integer-based algorithm.
+   * For even diameters, whose theoretical center lies between four pixels, it
+   * draws a "quad-capsule" by rendering four smaller, overlapping circles.
+   * This constructs a shape that is correctly sized and visually round,
+   * avoiding the artifacts of integer-to-radius conversion.
+   *
+   * @param center_x The x-coordinate of the circle's center.
+   * @param center_y The y-coordinate of the circle's center.
+   * @param diameter The diameter of the circle in pixels.
+   * @param color The color of the circle.
+   */
+  void filled_circle_by_diameter(int center_x, int center_y, int diameter, Color color);
+
   /// Fill a ring centered around [center_x,center_y] between two circles with the radius1 and radius2 with the given
   /// color.
   void filled_ring(int center_x, int center_y, int radius1, int radius2, Color color = COLOR_ON);
