@@ -2,7 +2,7 @@
 #include <utility>
 #include "display_color_utils.h"
 #include "esphome/core/hal.h"
-#include "esphome/core/log.hh"
+#include "esphome/core/log.h"
 #include <cmath> // For sqrtf, roundf
 
 namespace esphome {
