@@ -153,9 +153,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   } else {
     cap_diameter = thickness;
   }
-
-  // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
-  color = Color(255, 0, 0);
   
   this->filled_circle_by_diameter(x_start, y_start, cap_diameter, color);
   this->filled_circle_by_diameter(x_end, y_end, cap_diameter, color);
