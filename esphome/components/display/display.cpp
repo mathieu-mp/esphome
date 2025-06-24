@@ -142,11 +142,15 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
   // perfect rounded finish. The caps are always centered on the original start/end points.
+  
+  // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
+  Color cap_color = Color(255, 0, 0);
+
   if (thickness % 2 != 0) {
     // For odd thicknesses, the cap is a single perfect circle.
     const int radius = (thickness - 1) / 2;
-    this->filled_circle(x_start, y_start, radius, color);
-    this->filled_circle(x_end, y_end, radius, color);
+    this->filled_circle(x_start, y_start, radius, cap_color);
+    this->filled_circle(x_end, y_end, radius, cap_color);
   } else {
     // For even thicknesses, we create a "capsule" shape from two smaller offset circles.
     const int radius = (thickness / 2) - 1;
@@ -168,13 +172,13 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
       const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
       const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
 
-      this->filled_circle(m_x, m_y, radius, color);
-      this->filled_circle(n_x, n_y, radius, color);
-      this->filled_circle(o_x, o_y, radius, color);
-      this->filled_circle(p_x, p_y, radius, color);
+      this->filled_circle(m_x, m_y, radius, cap_color);
+      this->filled_circle(n_x, n_y, radius, cap_color);
+      this->filled_circle(o_x, o_y, radius, cap_color);
+      this->filled_circle(p_x, p_y, radius, cap_color);
     } else { 
       // For a zero-length line, a single circle is a reasonable representation.
-      this->filled_circle(x_start, y_start, radius, color);
+      this->filled_circle(x_start, y_start, radius, cap_color);
     }
   }
 }
