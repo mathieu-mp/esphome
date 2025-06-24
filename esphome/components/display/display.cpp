@@ -59,11 +59,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // vector for correct offsetting, avoiding a costly sqrt() in the main loop.
   const float line_length = sqrtf(dx * dx + dy * dy);
 
-  // If the line has zero length, we do nothing as there is no body and no caps.
-  if (line_length == 0) {
-    return;
-  }
-
   // --- MAIN BRESENHAM'S ALGORITHM SETUP ---
   int x_current = x_start;
   int y_current = y_start;
@@ -117,26 +112,50 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   };
 
   // --- MAIN LINE BODY DRAWING LOOP ---
-  while (true) {
-    draw_perp_brush(x_current, y_current);
-    if (x_current == x_end && y_current == y_end) break;
-    int error2_main = 2 * error_main;
-    const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
-    if (is_diagonal_move) {
-      draw_perp_brush(x_current, y_current + y_step_main);
-    }
-    if (error2_main >= y_dist_main) {
-      error_main += y_dist_main;
-      x_current += x_step_main;
-    }
-    if (error2_main <= x_dist_main) {
-      error_main += x_dist_main;
-      y_current += y_step_main;
+  if (line_length > 0) {
+    while (true) {
+      draw_perp_brush(x_current, y_current);
+      if (x_current == x_end && y_current == y_end) break;
+      int error2_main = 2 * error_main;
+      const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
+      if (is_diagonal_move) {
+        draw_perp_brush(x_current, y_current + y_step_main);
+      }
+      if (error2_main >= y_dist_main) {
+        error_main += y_dist_main;
+        x_current += x_step_main;
+      }
+      if (error2_main <= x_dist_main) {
+        error_main += x_dist_main;
+        y_current += y_step_main;
+      }
     }
   }
 
   // --- END CAPS DRAWING ---
-  // The end cap drawing logic has been completely removed for this test.
+  // To ensure the end cap correctly covers the line's "cut", we calculate the
+  // bounding box of the perpendicular brush stroke and use its largest dimension
+  // as the diameter for our circular cap.
+  if (line_length > 0) {
+    // Project the thickness onto the X and Y axes to find the cut's bounding box.
+    const float cut_width = thickness * fabsf(dy) / line_length;
+    const float cut_height = thickness * fabsf(dx) / line_length;
+
+    // The diameter of the cap must be large enough to cover the widest part of the cut.
+    const float cap_diameter = fmaxf(cut_width, cut_height);
+    
+    // Calculate the radius for the circle.
+    const int radius = roundf((cap_diameter - 1) / 2.0f);
+
+    if (radius >= 0) {
+      this->filled_circle(x_start, y_start, radius, color);
+      this->filled_circle(x_end, y_end, radius, color);
+    }
+  } else {
+    // For a zero-length line, the cap is simply a circle with the given thickness.
+    const int radius = (thickness - 1) / 2;
+    this->filled_circle(x_start, y_start, radius, color);
+  }
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
