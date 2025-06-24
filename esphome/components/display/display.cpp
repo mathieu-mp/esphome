@@ -72,9 +72,10 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     int error_perp = x_dist_perp + y_dist_perp;
 
     // Start drawing the perpendicular line from its calculated starting point to ensure it's centered.
-    // We offset by half the thickness along the perpendicular vector.
-    int x_perp = cx - ((thickness - 1) / 2) * x_step_perp;
-    int y_perp = cy - ((thickness - 1) / 2) * y_step_perp;
+    // We use floating-point division (by 2.0f) and roundf() to correctly handle both
+    // odd and even thicknesses, preventing the line body from shifting.
+    int x_perp = roundf(cx - ((thickness - 1) / 2.0f) * x_step_perp);
+    int y_perp = roundf(cy - ((thickness - 1) / 2.0f) * y_step_perp);
 
     for (int i = 0; i < thickness; ++i) {
       this->draw_pixel_at(x_perp, y_perp, color);
