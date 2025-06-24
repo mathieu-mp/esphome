@@ -3,7 +3,7 @@
 #include "display_color_utils.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
-#include <cmath> // For sqrtf, roundf
+#include <cmath> // For sqrtf, roundf, fabsf, fmaxf
 
 namespace esphome {
 namespace display {
@@ -142,12 +142,24 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish. A dedicated function is used to draw a circle from its
-  // diameter, which handles all complexities for a visually pleasing result.
-  // for debug:
-  color = Color(255, 0, 0);
-  this->filled_circle_by_diameter(x_start, y_start, thickness, color);
-  this->filled_circle_by_diameter(x_end, y_end, thickness, color);
+  // perfect rounded finish. The diameter of the cap is dynamically calculated
+  // to perfectly cover the "cut" of the line, even on diagonals.
+  
+  int cap_diameter;
+  if (line_length > 0) {
+    // Project the thickness onto the X and Y axes to find the cut's bounding box.
+    const float cut_width = thickness * fabsf(dy) / line_length;
+    const float cut_height = thickness * fabsf(dx) / line_length;
+
+    // The diameter of the cap must be large enough to cover the widest part of the cut.
+    cap_diameter = roundf(fmaxf(cut_width, cut_height));
+  } else {
+    // For a zero-length line, the cap diameter is simply the thickness.
+    cap_diameter = thickness;
+  }
+  
+  this->filled_circle_by_diameter(x_start, y_start, cap_diameter, color);
+  this->filled_circle_by_diameter(x_end, y_end, cap_diameter, color);
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
