@@ -59,7 +59,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   const int y_dist_main = -abs(dy);
   const int y_step_main = (dy > 0) - (dy < 0);
   int error_main = x_dist_main + y_dist_main;
-  int final_error = error_main; // Will be updated by the loop
 
   // --- PERPENDICULAR BRUSH LAMBDA ---
   auto draw_perp_brush = [&](int cx, int cy) {
@@ -105,7 +104,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     while (true) {
       draw_perp_brush(x_current, y_current);
       if (x_current == x_end && y_current == y_end) {
-        final_error = error_main; // Capture the final error
         break;
       }
       int error2_main = 2 * error_main;
@@ -126,40 +124,16 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish, with centers corrected based on the Bresenham error.
+  // perfect rounded finish.
   
   // Pragmatic diameter adjustment for better visual on diagonals.
+  // If the line is diagonal, the seam-filling makes the cut wider.
+  // We increase the cap diameter by 1 to cover this for a better visual result.
   int cap_diameter = (dx != 0 && dy != 0) ? thickness + 1 : thickness;
-
-  // Helper lambda to calculate the center offset from a given error.
-  auto get_offset_from_error = [&](int error, int d_x, int d_y) -> std::pair<int, int> {
-      int offset_x = 0;
-      int offset_y = 0;
-      int x_dist = abs(d_x);
-      int y_dist = -abs(d_y);
-
-      // The offset is applied on the minor axis, based on the error's final bias.
-      if (x_dist > abs(y_dist)) { // X-dominant line
-          if (2 * error > x_dist) {
-              offset_y = -((d_y > 0) - (d_y < 0));
-          }
-      } else { // Y-dominant line
-          if (2 * error < y_dist) {
-              offset_x = -((d_x > 0) - (d_x < 0));
-          }
-      }
-      return {offset_x, offset_y};
-  };
-
-  // Calculate correction for the end cap from the final error of the main loop.
-  std::pair<int, int> end_offset = get_offset_from_error(final_error, dx, dy);
   
-  // Calculate correction for the start cap by using the initial error of a reversed line.
-  int start_error_rev = abs(-dx) - abs(-dy);
-  std::pair<int, int> start_offset = get_offset_from_error(start_error_rev, -dx, -dy);
-
-  this->filled_circle_by_diameter(x_start + start_offset.first, y_start + start_offset.second, cap_diameter, color);
-  this->filled_circle_by_diameter(x_end + end_offset.first, y_end + end_offset.second, cap_diameter, color);
+  // The cap is centered on the original endpoint for stability.
+  this->filled_circle_by_diameter(x_start, y_start, cap_diameter, color);
+  this->filled_circle_by_diameter(x_end, y_end, cap_diameter, color);
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
