@@ -144,6 +144,8 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // The line body is now drawn. We draw the end caps on top to ensure a visually
   // perfect rounded finish. A dedicated function is used to draw a circle from its
   // diameter, which handles all complexities for a visually pleasing result.
+  // for debug:
+  color = Color(255, 0, 0);
   this->filled_circle_by_diameter(x_start, y_start, thickness, color);
   this->filled_circle_by_diameter(x_end, y_end, thickness, color);
 }
