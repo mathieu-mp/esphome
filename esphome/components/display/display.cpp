@@ -146,7 +146,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // to perfectly cover the "cut" of the line, even on diagonals.
 
   // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
-  Color color = Color(255, 0, 0);
+  color = Color(255, 0, 0);
   
   int cap_diameter;
   if (line_length > 0) {
