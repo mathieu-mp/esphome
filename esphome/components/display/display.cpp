@@ -105,11 +105,17 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   };
 
   // --- MAIN LINE BODY DRAWING LOOP ---
-  int x_prev = x_start, y_prev = y_start;
+  int x_prev = x_start, y_prev = y_start; // Used to detect the last move's type.
   if (line_length > 0) {
     int x_current = x_start;
     int y_current = y_start;
-    int error_main = abs(dx) - abs(dy);
+
+    // Setup for the main Bresenham algorithm.
+    const int x_dist_main = abs(dx);
+    const int x_step_main = (dx > 0) - (dx < 0);
+    const int y_dist_main = -abs(dy);
+    const int y_step_main = (dy > 0) - (dy < 0);
+    int error_main = x_dist_main + y_dist_main;
 
     while (true) {
       process_perp_brush(x_current, y_current, nullptr); // Draw mode
@@ -119,16 +125,16 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
       y_prev = y_current;
 
       int error2_main = 2 * error_main;
-      const bool is_diagonal_move = (error2_main > -abs(dx)) && (error2_main < abs(dy));
-       if (is_diagonal_move) {
-         process_perp_brush(x_current, y_current + y_step_main, nullptr);
-       }
-      if (error2_main > -abs(dx)) {
-        error_main -= abs(dy);
+      const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
+      if (is_diagonal_move) {
+        process_perp_brush(x_current, y_current + y_step_main, nullptr);
+      }
+      if (error2_main >= y_dist_main) {
+        error_main += y_dist_main;
         x_current += x_step_main;
       }
-      if (error2_main < abs(dy)) {
-        error_main += abs(dx);
+      if (error2_main <= x_dist_main) {
+        error_main += x_dist_main;
         y_current += y_step_main;
       }
     }
@@ -141,7 +147,10 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // If the last move was diagonal, the cut includes the correction brush. Measure it too.
   if (x_prev != x_end && y_prev != y_end) {
-      process_perp_brush(x_prev, y_end, &final_cut_box);
+    // Determine the position of the correction brush relative to the previous point.
+    // The main loop would have been at x_prev, y_prev and stepped in y to create the smear.
+    int smear_y = y_prev + ((dy > 0) - (dy < 0));
+    process_perp_brush(x_prev, smear_y, &final_cut_box);
   }
 
   const int cut_width = final_cut_box.max_x - final_cut_box.min_x + 1;
