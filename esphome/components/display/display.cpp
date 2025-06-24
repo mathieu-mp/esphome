@@ -250,19 +250,19 @@ void Display::filled_rectangle(int x1, int y1, int width, int height, Color colo
     this->horizontal_line(x1, i, width, color);
   }
 }
-void HOT Display::circle(int center_x, int center_xy, int radius, Color color) {
+void HOT Display::circle(int center_x, int center_y, int radius, Color color) {
   int dx = -radius;
   int dy = 0;
   int err = 2 - 2 * radius;
   int e2;
 
   do {
-    this->draw_pixel_at(center_x - dx, center_xy + dy, color);
-    this->draw_pixel_at(center_x + dx, center_xy + dy, color);
-    this->draw_pixel_at(center_x + dx, center_xy - dy, color);
-    this->draw_pixel_at(center_x - dx, center_xy - dy, color);
+    this->draw_pixel_at(center_x - dx, center_y + dy, color);
+    this->draw_pixel_at(center_x + dx, center_y + dy, color);
+    this->draw_pixel_at(center_x + dx, center_y - dy, color);
+    this->draw_pixel_at(center_x - dx, center_y - dy, color);
     e2 = err;
-    if (e2 < dy) {
+    if (e2 <= dy) { // Corrected bug
       err += ++dy * 2 + 1;
       if (-dx == dy && e2 <= dx) {
         e2 = 0;
@@ -288,7 +288,7 @@ void Display::filled_circle(int center_x, int center_y, int radius, Color color)
     this->horizontal_line(center_x + dx, center_y + dy, hline_width, color);
     this->horizontal_line(center_x + dx, center_y - dy, hline_width, color);
     e2 = err;
-    if (e2 < dy) {
+    if (e2 <= dy) { // Corrected bug from '<' to '<='
       err += ++dy * 2 + 1;
       if (-dx == dy && e2 <= dx) {
         e2 = 0;
