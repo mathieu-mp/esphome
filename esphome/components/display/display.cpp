@@ -47,28 +47,33 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     return;
   }
 
+  // Calculate the total delta of the line. This vector (dx, dy) will be used
+  // to determine the perpendicular brush direction robustly and consistently.
+  const int dx = x_end - x_start;
+  const int dy = y_end - y_start;
+
   // Main Bresenham's Algorithm Setup:
-  // Use temporary variables for the main line to keep original coordinates intact for the caps.
   int x_current = x_start;
   int y_current = y_start;
 
-  // These variables prepare the Bresenham's algorithm for the main line path.
-  int x_dist_main = abs(x_end - x_current);     // Total horizontal distance of the main line
-  int x_step_main = x_current < x_end ? 1 : -1;   // Direction of the step on the x-axis (+1 or -1)
-  int y_dist_main = -abs(y_end - y_current);    // Total vertical distance (negative for Bresenham)
-  int y_step_main = y_current < y_end ? 1 : -1;   // Direction of the step on the y-axis (+1 or -1)
-  int error_main = x_dist_main + y_dist_main;   // Initial error term for the main line
+  int x_dist_main = abs(dx);
+  int x_step_main = x_start < x_end ? 1 : -1;
+  int y_dist_main = -abs(dy);
+  int y_step_main = y_start < y_end ? 1 : -1;
+  int error_main = x_dist_main + y_dist_main;
 
   // This lambda function encapsulates the drawing of a single perpendicular brush stroke.
-  // It uses the main algorithm's direction vectors to determine the perpendicular orientation.
   auto draw_perpendicular_brush = [&](int cx, int cy) {
-    // The direction vector of the perpendicular line is derived from the main line's vector (dx, dy)
-    // which is implicitly represented by (x_dist_main, y_dist_main).
-    // The perpendicular vector is (-dy, dx), which translates to steps from the main algorithm.
-    int x_dist_perp = abs(y_dist_main);      // Perpendicular dx is proportional to main dy
-    int x_step_perp = y_step_main;           // Perpendicular x-step direction
-    int y_dist_perp = -abs(x_dist_main);     // Perpendicular dy is proportional to main dx
-    int y_step_perp = -x_step_main;          // Perpendicular y-step direction
+    // The perpendicular vector to the main line vector (dx, dy) is (-dy, dx).
+    // We use this to set up a new, independent Bresenham algorithm for the brush,
+    // which prevents orientation artifacts on horizontal or vertical lines.
+    const int perp_dx = -dy;
+    const int perp_dy = dx;
+
+    int x_dist_perp = abs(perp_dx);
+    int x_step_perp = perp_dx > 0 ? 1 : -1;
+    int y_dist_perp = -abs(perp_dy);
+    int y_step_perp = perp_dy > 0 ? 1 : -1;
     int error_perp = x_dist_perp + y_dist_perp;
 
     // Start drawing the perpendicular line from its calculated starting point to ensure it's centered.
@@ -93,26 +98,18 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
 
   // Main loop to draw the body of the line.
   while (true) {
-    // Draw the brush at the current position on the main line's path.
     draw_perpendicular_brush(x_current, y_current);
 
-    if (x_current == x_end && y_current == y_end)
+    if (x_current == x_end && y_current == y_end) {
       break;
+    }
     
     int error2_main = 2 * error_main;
-
-    // Check if the next step will be diagonal. This occurs when the error term
-    // crosses the thresholds for both X and Y movement simultaneously.
     const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
-
-    // If the move is diagonal, we must fill the gap that would otherwise be created.
-    // We do this by drawing an extra brush stroke at an intermediate position,
-    // effectively "smearing" the brush into the corner of the diagonal step.
     if (is_diagonal_move) {
       draw_perpendicular_brush(x_current, y_current + y_step_main);
     }
     
-    // Standard Bresenham step for the main line.
     if (error2_main >= y_dist_main) {
       error_main += y_dist_main;
       x_current += x_step_main;
@@ -124,25 +121,16 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   }
 
   // End Caps Drawing: This part remains unchanged.
-  // It is drawn after the line body to ensure perfect, rounded ends.
   if (thickness % 2 != 0) {
-    // For odd thicknesses, we can draw a single perfect circle.
     const int radius = (thickness - 1) / 2;
     this->filled_circle(x_start, y_start, radius, color);
     this->filled_circle(x_end, y_end, radius, color);
   } else {
-    // For even thicknesses, we draw a capsule made of two smaller circles
-    // with their centers shifted by 0.5px along the perpendicular vector.
-    // This creates a smooth cap with the exact requested thickness.
     const int radius = (thickness / 2) - 1;
-
-    // We need the angle for the perpendicular shift of the cap centers
-    const float angle = atan2f(y_end - y_start, x_end - x_start);
+    const float angle = atan2f(dy, dx);
     const float dx_perp_cap = sinf(angle);
     const float dy_perp_cap = -cosf(angle);
 
-    // Define the centers (M, N, O, P) of the four circles forming the caps.
-    // M and N form the start cap, O and P form the end cap.
     const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
     const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
     const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
@@ -152,7 +140,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
     const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
 
-    // Draw the two circles for each cap
     this->filled_circle(m_x, m_y, radius, color);
     this->filled_circle(n_x, n_y, radius, color);
     this->filled_circle(o_x, o_y, radius, color);
