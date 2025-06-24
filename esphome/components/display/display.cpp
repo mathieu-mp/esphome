@@ -63,10 +63,12 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   int x_current = x_start;
   int y_current = y_start;
 
-  const int x_dist_main = abs(dx);            // Total horizontal distance of the main line.
-  const int x_step_main = dx > 0 ? 1 : -1;    // Direction of the step on the x-axis (+1 or -1).
-  const int y_dist_main = -abs(dy);           // Total vertical distance (negative for Bresenham).
-  const int y_step_main = dy > 0 ? 1 : -1;    // Direction of the step on the y-axis (+1 or -1).
+  const int x_dist_main = abs(dx);
+  // Determine the step direction. This syntax correctly handles the case where dx is 0.
+  const int x_step_main = (dx > 0) - (dx < 0);
+  const int y_dist_main = -abs(dy);
+  // Determine the step direction. This syntax correctly handles the case where dy is 0.
+  const int y_step_main = (dy > 0) - (dy < 0);
   int error_main = x_dist_main + y_dist_main; // Initial error term for the main line.
 
   // --- PERPENDICULAR BRUSH LAMBDA ---
@@ -80,9 +82,11 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     const int perp_dy = dx;
 
     int x_dist_perp = abs(perp_dx);
-    int x_step_perp = perp_dx > 0 ? 1 : -1;
+    // Determine the step direction. This syntax correctly handles the case where perp_dx is 0.
+    int x_step_perp = (perp_dx > 0) - (perp_dx < 0);
     int y_dist_perp = -abs(perp_dy);
-    int y_step_perp = perp_dy > 0 ? 1 : -1;
+    // Determine the step direction. This syntax correctly handles the case where perp_dy is 0.
+    int y_step_perp = (perp_dy > 0) - (perp_dy < 0);
     int error_perp = x_dist_perp + y_dist_perp;
 
     // --- Brush Stroke Drawing ---
