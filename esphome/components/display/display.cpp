@@ -144,6 +144,9 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // The line body is now drawn. We draw the end caps on top to ensure a visually
   // perfect rounded finish. The diameter of the cap is dynamically calculated
   // to perfectly cover the "cut" of the line, even on diagonals.
+
+  // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
+  Color cap_color = Color(255, 0, 0);
   
   int cap_diameter;
   if (line_length > 0) {
