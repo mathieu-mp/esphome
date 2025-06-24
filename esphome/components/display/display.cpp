@@ -3,7 +3,7 @@
 #include "display_color_utils.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
-#include <cmath> // For sqrtf, roundf, fabsf, fmaxf
+#include <cmath> // For sqrtf, roundf, fabsf
 
 namespace esphome {
 namespace display {
@@ -143,7 +143,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // --- END CAPS DRAWING ---
   // The line body is now drawn. We draw the end caps on top to ensure a visually
   // perfect rounded finish. The diameter of the cap is dynamically calculated
-  // to perfectly cover the "cut" of the line, even on diagonals.
+  // to perfectly cover the "cut" of the line, based on its dominant axis.
 
   // FOR DEBUGGING: Force end caps to be red to visualize their shape and position.
   color = Color(255, 0, 0);
@@ -154,8 +154,16 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     const float cut_width = thickness * fabsf(dy) / line_length;
     const float cut_height = thickness * fabsf(dx) / line_length;
 
-    // The diameter of the cap must be large enough to cover the widest part of the cut.
-    cap_diameter = roundf(fmaxf(cut_width, cut_height));
+    // The cap diameter depends on the main line's dominant axis.
+    if (abs(dx) > abs(dy)) {
+        // Line is mostly horizontal, so the perpendicular cut is mostly vertical.
+        // The cap must cover the cut's height.
+        cap_diameter = roundf(cut_height);
+    } else {
+        // Line is mostly vertical, so the perpendicular cut is mostly horizontal.
+        // The cap must cover the cut's width.
+        cap_diameter = roundf(cut_width);
+    }
   } else {
     // For a zero-length line, the cap diameter is simply the thickness.
     cap_diameter = thickness;
