@@ -143,12 +143,14 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // A unified "capsule" approach is used for all thicknesses to ensure a full,
   // rounded end that correctly covers the line body, even on diagonals.
   // The capsule is formed by two overlapping circles, offset by 0.5px from the endpoint.
+  // The radius of these circles depends on the thickness parity to achieve the correct final width.
   const int radius = (thickness % 2 != 0) ? (thickness - 1) / 2 : (thickness / 2) - 1;
 
   if (line_length > 0) {
-    // Calculate the perpendicular vector for offsetting the cap centers.
-    const float dx_perp_cap = -dy / line_length;
-    const float dy_perp_cap = dx / line_length;
+    // The atan2f method is stable and provides the correct angle for the perpendicular vector.
+    const float angle = atan2f(dy, dx);
+    const float dx_perp_cap = sinf(angle);
+    const float dy_perp_cap = -cosf(angle);
 
     // Define the centers for the two circles forming the start cap.
     const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
@@ -171,7 +173,6 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     this->filled_circle(x_start, y_start, radius, color);
   }
 }
-
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
   this->line_at_angle(x, y, angle, 0, length, color);
