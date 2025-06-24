@@ -59,10 +59,9 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // vector for correct offsetting, avoiding a costly sqrt() in the main loop.
   const float line_length = sqrtf(dx * dx + dy * dy);
 
-  // If the line has zero length, just draw the end caps (which will overlap) and exit.
+  // If the line has zero length, we do nothing as there is no body and no caps.
   if (line_length == 0) {
-    // The end cap drawing logic at the end of the function will handle this case.
-    // We just need to skip the body drawing part.
+    return;
   }
 
   // --- MAIN BRESENHAM'S ALGORITHM SETUP ---
@@ -76,7 +75,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   int error_main = x_dist_main + y_dist_main;
 
   // --- PERPENDICULAR BRUSH LAMBDA ---
-  auto draw_perpendicular_brush = [&](int cx, int cy) {
+  auto draw_perp_brush = [&](int cx, int cy) {
     // --- Perpendicular Bresenham's Algorithm Setup ---
     const int perp_dx = -dy;
     const int perp_dy = dx;
@@ -98,8 +97,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
       x_perp = roundf(cx - offset * (-dy / line_length));
       y_perp = roundf(cy - offset * (dx / line_length));
     } else {
-      // For a zero-length line (a single point), the perpendicular is undefined.
-      // We just center the brush on the point itself.
+      // This case is unlikely due to the early exit, but kept for robustness.
       x_perp = roundf(cx - offset * x_step_perp);
       y_perp = roundf(cy - offset * y_step_perp);
     }
@@ -119,34 +117,26 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   };
 
   // --- MAIN LINE BODY DRAWING LOOP ---
-  if (line_length > 0) {
-    while (true) {
-      draw_perpendicular_brush(x_current, y_current);
-      if (x_current == x_end && y_current == y_end) break;
-      int error2_main = 2 * error_main;
-      const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
-      if (is_diagonal_move) {
-        draw_perpendicular_brush(x_current, y_current + y_step_main);
-      }
-      if (error2_main >= y_dist_main) {
-        error_main += y_dist_main;
-        x_current += x_step_main;
-      }
-      if (error2_main <= x_dist_main) {
-        error_main += x_dist_main;
-        y_current += y_step_main;
-      }
+  while (true) {
+    draw_perp_brush(x_current, y_current);
+    if (x_current == x_end && y_current == y_end) break;
+    int error2_main = 2 * error_main;
+    const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
+    if (is_diagonal_move) {
+      draw_perp_brush(x_current, y_current + y_step_main);
+    }
+    if (error2_main >= y_dist_main) {
+      error_main += y_dist_main;
+      x_current += x_step_main;
+    }
+    if (error2_main <= x_dist_main) {
+      error_main += x_dist_main;
+      y_current += y_step_main;
     }
   }
 
-  // --- END CAPS DRAWING (TESTING VERSION) ---
-  // For this test, we use a single, centered circle for all thicknesses to establish a baseline.
-  // The capsule logic has been temporarily removed.
-  // Note: For an even thickness 't', a single circle cannot have a diameter of 't'.
-  // This calculation will produce a circle with a diameter of 't-1'.
-  const int radius = (thickness - 1) / 2;
-  this->filled_circle(x_start, y_start, radius, color);
-  this->filled_circle(x_end, y_end, radius, color);
+  // --- END CAPS DRAWING ---
+  // The end cap drawing logic has been completely removed for this test.
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
