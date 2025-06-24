@@ -37,7 +37,7 @@ void HOT Display::line(int x1, int y1, int x2, int y2, Color color) {
 }
 
 void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thickness, Color color) {
-  // A thickness of 0 or less is not displayable, so we do nothing.
+  // A thickness of 0 or less is not displayable.
   if (thickness <= 0) {
     return;
   }
@@ -47,26 +47,35 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     return;
   }
 
-  // Calculate the total delta of the line. This vector (dx, dy) will be used
-  // to determine the perpendicular brush direction robustly and consistently.
+  // This function uses a "double Bresenham" algorithm. A "main" algorithm plots the
+  // central path of the line. For each point on this path, a second, "perpendicular"
+  // Bresenham algorithm is called to draw a brush stroke, creating the thickness.
+
+  // --- GLOBAL SETUP ---
+  // Calculate the total delta of the line. This vector (dx, dy) is stored to
+  // robustly and consistently determine the perpendicular brush's orientation later on,
+  // avoiding artifacts on perfectly horizontal or vertical lines.
   const int dx = x_end - x_start;
   const int dy = y_end - y_start;
 
-  // Main Bresenham's Algorithm Setup:
+  // --- MAIN BRESENHAM'S ALGORITHM SETUP ---
+  // This section prepares the main algorithm that will trace the center of the line.
   int x_current = x_start;
   int y_current = y_start;
 
-  int x_dist_main = abs(dx);
-  int x_step_main = x_start < x_end ? 1 : -1;
-  int y_dist_main = -abs(dy);
-  int y_step_main = y_start < y_end ? 1 : -1;
-  int error_main = x_dist_main + y_dist_main;
+  const int x_dist_main = abs(dx);            // Total horizontal distance of the main line.
+  const int x_step_main = dx > 0 ? 1 : -1;    // Direction of the step on the x-axis (+1 or -1).
+  const int y_dist_main = -abs(dy);           // Total vertical distance (negative for Bresenham).
+  const int y_step_main = dy > 0 ? 1 : -1;    // Direction of the step on the y-axis (+1 or -1).
+  int error_main = x_dist_main + y_dist_main; // Initial error term for the main line.
 
+  // --- PERPENDICULAR BRUSH LAMBDA ---
   // This lambda function encapsulates the drawing of a single perpendicular brush stroke.
-  auto draw_perpendicular_brush = [&](int cx, int cy) {
+  // It is called for each point along the main line's path.
+  auto draw_perp_brush = [&](int cx, int cy) {
+    // --- Perpendicular Bresenham's Algorithm Setup ---
     // The perpendicular vector to the main line vector (dx, dy) is (-dy, dx).
-    // We use this to set up a new, independent Bresenham algorithm for the brush,
-    // which prevents orientation artifacts on horizontal or vertical lines.
+    // We use this to set up a new, independent Bresenham algorithm for the brush.
     const int perp_dx = -dy;
     const int perp_dy = dx;
 
@@ -76,12 +85,15 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     int y_step_perp = perp_dy > 0 ? 1 : -1;
     int error_perp = x_dist_perp + y_dist_perp;
 
-    // Start drawing the perpendicular line from its calculated starting point to ensure it's centered.
-    // We use floating-point division (by 2.0f) and roundf() to correctly handle both
-    // odd and even thicknesses, preventing the line body from shifting.
+    // --- Brush Stroke Drawing ---
+    // Calculate the start point of the brush stroke. To center the brush correctly,
+    // we offset from the center point (cx, cy) by half the thickness along the
+    // perpendicular vector. Using floating-point division (by 2.0f) and roundf()
+    // ensures this works for both odd and even thicknesses.
     int x_perp = roundf(cx - ((thickness - 1) / 2.0f) * x_step_perp);
     int y_perp = roundf(cy - ((thickness - 1) / 2.0f) * y_step_perp);
 
+    // Draw the 'thickness' number of pixels for the brush stroke.
     for (int i = 0; i < thickness; ++i) {
       this->draw_pixel_at(x_perp, y_perp, color);
       int error2_perp = 2 * error_perp;
@@ -96,20 +108,30 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     }
   };
 
-  // Main loop to draw the body of the line.
+  // --- MAIN LINE BODY DRAWING LOOP ---
+  // This loop iterates along the main line's path and calls the brush drawer.
   while (true) {
-    draw_perpendicular_brush(x_current, y_current);
+    draw_perp_brush(x_current, y_current);
 
+    // Stop once we have reached the end point.
     if (x_current == x_end && y_current == y_end) {
       break;
     }
     
     int error2_main = 2 * error_main;
+
+    // Check if the next step will be diagonal. This occurs when the error term
+    // crosses the thresholds for both X and Y movement in the same iteration.
     const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
+
+    // If the move is diagonal, a gap can form between brush strokes.
+    // We fill this gap by drawing an extra brush stroke at an intermediate
+    // position, effectively "smearing" the brush into the corner of the diagonal step.
     if (is_diagonal_move) {
-      draw_perpendicular_brush(x_current, y_current + y_step_main);
+      draw_perp_brush(x_current, y_current + y_step_main);
     }
     
+    // Standard Bresenham step for the main line.
     if (error2_main >= y_dist_main) {
       error_main += y_dist_main;
       x_current += x_step_main;
@@ -120,17 +142,27 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     }
   }
 
-  // End Caps Drawing: This part remains unchanged.
+  // --- END CAPS DRAWING ---
+  // The line body is now drawn. We draw the end caps on top to ensure a visually
+  // perfect rounded finish. The caps are always centered on the original start/end points.
   if (thickness % 2 != 0) {
+    // For odd thicknesses, the cap is a single perfect circle with a radius
+    // corresponding to half the thickness.
     const int radius = (thickness - 1) / 2;
     this->filled_circle(x_start, y_start, radius, color);
     this->filled_circle(x_end, y_end, radius, color);
   } else {
+    // For even thicknesses, a single circle would not be centered on the pixel grid.
+    // We create a "capsule" shape by drawing two smaller circles, whose centers are
+    // shifted by 0.5px from the endpoint along the perpendicular vector.
+    // This provides a smooth cap while maintaining the exact requested thickness.
     const int radius = (thickness / 2) - 1;
     const float angle = atan2f(dy, dx);
     const float dx_perp_cap = sinf(angle);
     const float dy_perp_cap = -cosf(angle);
 
+    // Define the centers (M, N, O, P) of the four circles forming the two caps.
+    // M and N form the start cap, O and P form the end cap.
     const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
     const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
     const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
@@ -140,6 +172,7 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
     const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
 
+    // Draw the two circles for each cap.
     this->filled_circle(m_x, m_y, radius, color);
     this->filled_circle(n_x, n_y, radius, color);
     this->filled_circle(o_x, o_y, radius, color);
