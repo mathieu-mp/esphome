@@ -139,39 +139,14 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
     }
   }
 
-  // --- END CAPS DRAWING ---
-  // A unified "capsule" approach is used for all thicknesses to ensure a full,
-  // rounded end that correctly covers the line body, even on diagonals.
-  // The capsule is formed by two overlapping circles, offset by 0.5px from the endpoint.
-  // The radius of these circles depends on the thickness parity to achieve the correct final width.
-  const int radius = (thickness % 2 != 0) ? (thickness - 1) / 2 : (thickness / 2) - 1;
-
-  if (line_length > 0) {
-    // The atan2f method is stable and provides the correct angle for the perpendicular vector.
-    const float angle = atan2f(dy, dx);
-    const float dx_perp_cap = sinf(angle);
-    const float dy_perp_cap = -cosf(angle);
-
-    // Define the centers for the two circles forming the start cap.
-    const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
-    const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
-    const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
-    const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
-
-    // Define the centers for the two circles forming the end cap.
-    const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
-    const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
-    const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
-    const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
-
-    this->filled_circle(m_x, m_y, radius, color);
-    this->filled_circle(n_x, n_y, radius, color);
-    this->filled_circle(o_x, o_y, radius, color);
-    this->filled_circle(p_x, p_y, radius, color);
-  } else {
-    // For a zero-length line, a single circle is a reasonable representation of the capsule.
-    this->filled_circle(x_start, y_start, radius, color);
-  }
+  // --- END CAPS DRAWING (TESTING VERSION) ---
+  // For this test, we use a single, centered circle for all thicknesses to establish a baseline.
+  // The capsule logic has been temporarily removed.
+  // Note: For an even thickness 't', a single circle cannot have a diameter of 't'.
+  // This calculation will produce a circle with a diameter of 't-1'.
+  const int radius = (thickness - 1) / 2;
+  this->filled_circle(x_start, y_start, radius, color);
+  this->filled_circle(x_end, y_end, radius, color);
 }
 
 void Display::line_at_angle(int x, int y, int angle, int length, Color color) {
