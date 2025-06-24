@@ -52,52 +52,58 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   // Bresenham algorithm is called to draw a brush stroke, creating the thickness.
 
   // --- GLOBAL SETUP ---
-  // Calculate the total delta of the line. This vector (dx, dy) is stored to
-  // robustly and consistently determine the perpendicular brush's orientation later on,
-  // avoiding artifacts on perfectly horizontal or vertical lines.
   const int dx = x_end - x_start;
   const int dy = y_end - y_start;
 
+  // Pre-calculate the line length. This is used to normalize the perpendicular
+  // vector for correct offsetting, avoiding a costly sqrt() in the main loop.
+  const float line_length = sqrtf(dx * dx + dy * dy);
+
+  // If the line has zero length, just draw the end caps (which will overlap) and exit.
+  if (line_length == 0) {
+    // The end cap drawing logic at the end of the function will handle this case.
+    // We just need to skip the body drawing part.
+  }
+
   // --- MAIN BRESENHAM'S ALGORITHM SETUP ---
-  // This section prepares the main algorithm that will trace the center of the line.
   int x_current = x_start;
   int y_current = y_start;
 
   const int x_dist_main = abs(dx);
-  // Determine the step direction. This syntax correctly handles the case where dx is 0.
   const int x_step_main = (dx > 0) - (dx < 0);
   const int y_dist_main = -abs(dy);
-  // Determine the step direction. This syntax correctly handles the case where dy is 0.
   const int y_step_main = (dy > 0) - (dy < 0);
-  int error_main = x_dist_main + y_dist_main; // Initial error term for the main line.
+  int error_main = x_dist_main + y_dist_main;
 
   // --- PERPENDICULAR BRUSH LAMBDA ---
-  // This lambda function encapsulates the drawing of a single perpendicular brush stroke.
-  // It is called for each point along the main line's path.
-  auto draw_perp_brush = [&](int cx, int cy) {
+  auto draw_perpendicular_brush = [&](int cx, int cy) {
     // --- Perpendicular Bresenham's Algorithm Setup ---
-    // The perpendicular vector to the main line vector (dx, dy) is (-dy, dx).
-    // We use this to set up a new, independent Bresenham algorithm for the brush.
     const int perp_dx = -dy;
     const int perp_dy = dx;
 
     int x_dist_perp = abs(perp_dx);
-    // Determine the step direction. This syntax correctly handles the case where perp_dx is 0.
     int x_step_perp = (perp_dx > 0) - (perp_dx < 0);
     int y_dist_perp = -abs(perp_dy);
-    // Determine the step direction. This syntax correctly handles the case where perp_dy is 0.
     int y_step_perp = (perp_dy > 0) - (perp_dy < 0);
     int error_perp = x_dist_perp + y_dist_perp;
 
     // --- Brush Stroke Drawing ---
-    // Calculate the start point of the brush stroke. To center the brush correctly,
-    // we offset from the center point (cx, cy) by half the thickness along the
-    // perpendicular vector. Using floating-point division (by 2.0f) and roundf()
-    // ensures this works for both odd and even thicknesses.
-    int x_perp = roundf(cx - ((thickness - 1) / 2.0f) * x_step_perp);
-    int y_perp = roundf(cy - ((thickness - 1) / 2.0f) * y_step_perp);
+    // Calculate the offset distance for centering the brush.
+    const float offset = (thickness - 1) / 2.0f;
+    int x_perp, y_perp;
 
-    // Draw the 'thickness' number of pixels for the brush stroke.
+    if (line_length > 0) {
+      // For lines with length, calculate the start point by offsetting along the
+      // normalized perpendicular vector. This is the only geometrically correct way.
+      x_perp = roundf(cx - offset * (-dy / line_length));
+      y_perp = roundf(cy - offset * (dx / line_length));
+    } else {
+      // For a zero-length line (a single point), the perpendicular is undefined.
+      // We just center the brush on the point itself.
+      x_perp = roundf(cx - offset * x_step_perp);
+      y_perp = roundf(cy - offset * y_step_perp);
+    }
+
     for (int i = 0; i < thickness; ++i) {
       this->draw_pixel_at(x_perp, y_perp, color);
       int error2_perp = 2 * error_perp;
@@ -113,74 +119,52 @@ void Display::thick_line(int x_start, int y_start, int x_end, int y_end, int thi
   };
 
   // --- MAIN LINE BODY DRAWING LOOP ---
-  // This loop iterates along the main line's path and calls the brush drawer.
-  while (true) {
-    draw_perp_brush(x_current, y_current);
-
-    // Stop once we have reached the end point.
-    if (x_current == x_end && y_current == y_end) {
-      break;
-    }
-    
-    int error2_main = 2 * error_main;
-
-    // Check if the next step will be diagonal. This occurs when the error term
-    // crosses the thresholds for both X and Y movement in the same iteration.
-    const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
-
-    // If the move is diagonal, a gap can form between brush strokes.
-    // We fill this gap by drawing an extra brush stroke at an intermediate
-    // position, effectively "smearing" the brush into the corner of the diagonal step.
-    if (is_diagonal_move) {
-      draw_perp_brush(x_current, y_current + y_step_main);
-    }
-    
-    // Standard Bresenham step for the main line.
-    if (error2_main >= y_dist_main) {
-      error_main += y_dist_main;
-      x_current += x_step_main;
-    }
-    if (error2_main <= x_dist_main) {
-      error_main += x_dist_main;
-      y_current += y_step_main;
+  if (line_length > 0) {
+    while (true) {
+      draw_perpendicular_brush(x_current, y_current);
+      if (x_current == x_end && y_current == y_end) break;
+      int error2_main = 2 * error_main;
+      const bool is_diagonal_move = (error2_main >= y_dist_main) && (error2_main <= x_dist_main);
+      if (is_diagonal_move) {
+        draw_perpendicular_brush(x_current, y_current + y_step_main);
+      }
+      if (error2_main >= y_dist_main) {
+        error_main += y_dist_main;
+        x_current += x_step_main;
+      }
+      if (error2_main <= x_dist_main) {
+        error_main += x_dist_main;
+        y_current += y_step_main;
+      }
     }
   }
 
   // --- END CAPS DRAWING ---
-  // The line body is now drawn. We draw the end caps on top to ensure a visually
-  // perfect rounded finish. The caps are always centered on the original start/end points.
   if (thickness % 2 != 0) {
-    // For odd thicknesses, the cap is a single perfect circle with a radius
-    // corresponding to half the thickness.
     const int radius = (thickness - 1) / 2;
     this->filled_circle(x_start, y_start, radius, color);
     this->filled_circle(x_end, y_end, radius, color);
   } else {
-    // For even thicknesses, a single circle would not be centered on the pixel grid.
-    // We create a "capsule" shape by drawing two smaller circles, whose centers are
-    // shifted by 0.5px from the endpoint along the perpendicular vector.
-    // This provides a smooth cap while maintaining the exact requested thickness.
     const int radius = (thickness / 2) - 1;
-    const float angle = atan2f(dy, dx);
-    const float dx_perp_cap = sinf(angle);
-    const float dy_perp_cap = -cosf(angle);
+    if (line_length > 0) {
+      const float dx_perp_cap = -dy / line_length;
+      const float dy_perp_cap = dx / line_length;
+      const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
+      const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
+      const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
+      const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
+      const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
+      const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
+      const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
+      const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
 
-    // Define the centers (M, N, O, P) of the four circles forming the two caps.
-    // M and N form the start cap, O and P form the end cap.
-    const int m_x = roundf(x_start - dx_perp_cap * 0.5f);
-    const int m_y = roundf(y_start - dy_perp_cap * 0.5f);
-    const int n_x = roundf(x_start + dx_perp_cap * 0.5f);
-    const int n_y = roundf(y_start + dy_perp_cap * 0.5f);
-    const int o_x = roundf(x_end - dx_perp_cap * 0.5f);
-    const int o_y = roundf(y_end - dy_perp_cap * 0.5f);
-    const int p_x = roundf(x_end + dx_perp_cap * 0.5f);
-    const int p_y = roundf(y_end + dy_perp_cap * 0.5f);
-
-    // Draw the two circles for each cap.
-    this->filled_circle(m_x, m_y, radius, color);
-    this->filled_circle(n_x, n_y, radius, color);
-    this->filled_circle(o_x, o_y, radius, color);
-    this->filled_circle(p_x, p_y, radius, color);
+      this->filled_circle(m_x, m_y, radius, color);
+      this->filled_circle(n_x, n_y, radius, color);
+      this->filled_circle(o_x, o_y, radius, color);
+      this->filled_circle(p_x, p_y, radius, color);
+    } else { // Zero-length line: just draw the cap at the start point
+      this->filled_circle(x_start, y_start, radius, color);
+    }
   }
 }
 
